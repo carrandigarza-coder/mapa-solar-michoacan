@@ -1,0 +1,1281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Irradiación Solar — Michoacán</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Space+Mono&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#0D1B2A;font-family:'Syne',sans-serif;color:#E8E0D0;
+      height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{padding:.8rem 1.5rem;background:#0D1B2A;
+        border-bottom:1px solid rgba(255,184,0,.2);
+        display:flex;align-items:center;gap:.8rem;flex-shrink:0}
+.sun{width:26px;height:26px;border-radius:50%;background:#FFB800;
+      box-shadow:0 0 14px rgba(255,184,0,.5);flex-shrink:0;
+      animation:pulse 3s ease-in-out infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 14px rgba(255,184,0,.5)}
+                  50%{box-shadow:0 0 22px rgba(255,184,0,.9)}}
+h1{font-size:1rem;font-weight:800}
+h1 span{color:#FFB800}
+.subtitle{font-family:'Space Mono',monospace;font-size:.58rem;color:#7A8EA8;margin-top:.1rem}
+.stats-bar{display:flex;gap:1.5rem;padding:.5rem 1.5rem;
+            background:#0D1B2A;border-bottom:1px solid rgba(255,184,0,.08);
+            flex-shrink:0;flex-wrap:wrap}
+.stat-item{display:flex;flex-direction:column;line-height:1.2}
+.stat-lbl{font-family:'Space Mono',monospace;font-size:.55rem;color:#7A8EA8;letter-spacing:.06em}
+.stat-val{font-size:.9rem;font-weight:800;color:#FFB800}
+.stat-unit{font-family:'Space Mono',monospace;font-size:.55rem;color:#7A8EA8}
+.tabs{display:flex;gap:.4rem;padding:.6rem 1.5rem;
+       background:#0D1B2A;border-bottom:1px solid rgba(255,184,0,.1);
+       flex-shrink:0;flex-wrap:wrap}
+.tab-btn{padding:.4rem 1rem;border-radius:7px;
+          border:1px solid rgba(255,184,0,.2);background:#1B2D44;
+          color:#7A8EA8;font-family:'Syne',sans-serif;font-size:.75rem;
+          font-weight:600;cursor:pointer;transition:all .2s}
+.tab-btn:hover{border-color:rgba(255,184,0,.5);color:#E8E0D0}
+.tab-btn.active{background:rgba(255,184,0,.15);border-color:#FFB800;color:#FFB800}
+.main-area{flex:1;position:relative;overflow:hidden}
+#map-container{position:absolute;inset:0}
+#map{position:absolute;inset:0}
+.map-panel{display:none}
+.map-panel.active{display:block}
+.legend-box{position:absolute;bottom:30px;right:12px;z-index:1000;
+             background:rgba(13,27,42,.93);border:1px solid rgba(255,184,0,.25);
+             border-radius:10px;padding:.7rem 1rem;min-width:155px;
+             backdrop-filter:blur(8px)}
+.legend-title{font-family:'Space Mono',monospace;font-size:.6rem;color:#FFB800;
+               letter-spacing:.08em;text-transform:uppercase;margin-bottom:.4rem}
+.legend-gradient{height:11px;border-radius:4px;margin-bottom:.3rem}
+.legend-labels{display:flex;justify-content:space-between;
+                font-family:'Space Mono',monospace;font-size:.6rem;color:#7A8EA8}
+.info-box{position:absolute;bottom:30px;left:12px;z-index:1000;
+           background:rgba(13,27,42,.88);border:1px solid rgba(255,184,0,.2);
+           border-radius:9px;padding:.6rem .9rem;
+           font-family:'Space Mono',monospace;font-size:.62rem;color:#7A8EA8;
+           backdrop-filter:blur(6px)}
+.info-box b{color:#FFB800}
+#panel-municipios{
+  display:none;position:absolute;inset:0;
+  background:#0D1B2A;overflow-y:auto;padding:1.5rem;z-index:10;
+}
+.charts-header{
+  display:flex;align-items:center;justify-content:space-between;
+  max-width:1400px;margin:0 auto 1.2rem;flex-wrap:wrap;gap:.8rem;
+}
+.charts-header-title{font-size:.9rem;font-weight:700;color:#FFB800}
+.var-selector{display:flex;gap:.4rem;flex-wrap:wrap}
+.var-btn{
+  padding:.35rem .9rem;border-radius:6px;
+  border:1px solid rgba(255,184,0,.2);background:#1B2D44;
+  color:#7A8EA8;font-family:'Syne',sans-serif;font-size:.72rem;
+  font-weight:600;cursor:pointer;transition:all .2s;
+}
+.var-btn:hover{border-color:rgba(255,184,0,.4);color:#E8E0D0}
+.var-btn.active{background:rgba(255,184,0,.15);border-color:#FFB800;color:#FFB800}
+.charts-grid{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:1.5rem;max-width:1400px;margin:0 auto;
+}
+.chart-card{
+  background:#1B2D44;border:1px solid rgba(255,184,0,.15);
+  border-radius:14px;padding:1.2rem;position:relative;overflow:hidden;
+}
+.chart-card::after{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,#FFB800,#FF6B35);
+}
+.chart-card-title{font-size:.85rem;font-weight:700;color:#FFB800;margin-bottom:.2rem}
+.chart-card-sub{font-family:'Space Mono',monospace;font-size:.62rem;
+                 color:#7A8EA8;margin-bottom:1rem}
+@media(max-width:800px){.charts-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <div class="sun"></div>
+  <div>
+    <h1>Irradiación Solar — <span>Michoacán</span></h1>
+    <div class="subtitle">HORAS PRODUCTIVAS · 57 PUNTOS · PROMEDIO HISTÓRICO</div>
+  </div>
+</header>
+<div class="stats-bar">
+    <div class="stat-item">
+      <span class="stat-lbl">GHI MEDIA</span>
+      <span class="stat-val">642</span>
+      <span class="stat-unit">W/m²</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-lbl">GHI MÁX</span>
+      <span class="stat-val">684</span>
+      <span class="stat-unit">W/m²</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-lbl">DNI MEDIA</span>
+      <span class="stat-val">632</span>
+      <span class="stat-unit">W/m²</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-lbl">DNI MÁX</span>
+      <span class="stat-val">697</span>
+      <span class="stat-unit">W/m²</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-lbl">DHI MEDIA</span>
+      <span class="stat-val">177</span>
+      <span class="stat-unit">W/m²</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-lbl">DHI MÁX</span>
+      <span class="stat-val">208</span>
+      <span class="stat-unit">W/m²</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-lbl">clearsky_ghi MEDIA</span>
+      <span class="stat-val">748</span>
+      <span class="stat-unit">W/m²</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-lbl">clearsky_ghi MÁX</span>
+      <span class="stat-val">785</span>
+      <span class="stat-unit">W/m²</span>
+    </div></div>
+<div class="tabs"><button class="tab-btn active" onclick="switchTab('GHI')">GHI — Global Horizontal</button>
+<button class="tab-btn " onclick="switchTab('DNI')">DNI — Direct Normal</button>
+<button class="tab-btn " onclick="switchTab('DHI')">DHI — Diffuse Horizontal</button>
+<button class="tab-btn " onclick="switchTab('clearsky_ghi')">Clearsky GHI</button>
+<button class="tab-btn" onclick="switchTab('municipios')">📊 Municipios</button>
+</div>
+<div class="main-area">
+  <div id="map-container">
+    <div id="map"></div>
+    <div id="legends">
+    <div class="map-panel active" id="panel-GHI">
+      <div class="legend-box">
+        <div class="legend-title">GHI (W/m²)</div>
+        <div class="legend-gradient" style="background:linear-gradient(to right,#ffffcc, #fed976, #fd8d3c, #e31a1c, #800026)"></div>
+        <div class="legend-labels">
+          <span>592</span><span>636</span><span>680</span>
+        </div>
+      </div>
+    </div>
+    <div class="map-panel " id="panel-DNI">
+      <div class="legend-box">
+        <div class="legend-title">DNI (W/m²)</div>
+        <div class="legend-gradient" style="background:linear-gradient(to right,#ffffe5, #fee391, #fe9929, #cc4c02, #662506)"></div>
+        <div class="legend-labels">
+          <span>559</span><span>626</span><span>693</span>
+        </div>
+      </div>
+    </div>
+    <div class="map-panel " id="panel-DHI">
+      <div class="legend-box">
+        <div class="legend-title">DHI (W/m²)</div>
+        <div class="legend-gradient" style="background:linear-gradient(to right,#f1eef6, #bdc9e1, #74a9cf, #0570b0, #023858)"></div>
+        <div class="legend-labels">
+          <span>161</span><span>180</span><span>199</span>
+        </div>
+      </div>
+    </div>
+    <div class="map-panel " id="panel-clearsky_ghi">
+      <div class="legend-box">
+        <div class="legend-title">clearsky_ghi (W/m²)</div>
+        <div class="legend-gradient" style="background:linear-gradient(to right,#ffffe5, #addd8e, #41ab5d, #006837, #004529)"></div>
+        <div class="legend-labels">
+          <span>722</span><span>749</span><span>777</span>
+        </div>
+      </div>
+    </div></div>
+    <div class="info-box">
+      <b>57</b> archivos cargados<br>
+      <b>57</b> puntos en mapa<br>
+      Clic en un punto = valor exacto
+    </div>
+  </div>
+  <div id="panel-municipios">
+    <div class="charts-header">
+      <span class="charts-header-title">Irradiación por Municipio</span>
+      <div class="var-selector"><button class="var-btn active" onclick="cambiarVariable('GHI')">GHI</button><button class="var-btn" onclick="cambiarVariable('DNI')">DNI</button><button class="var-btn" onclick="cambiarVariable('DHI')">DHI</button><button class="var-btn" onclick="cambiarVariable('clearsky_ghi')">clearsky_ghi</button></div>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-card-title" id="titulo-barras">GHI Promedio por Municipio</div>
+        <div class="chart-card-sub">Promedio horas productivas — W/m²</div>
+        <div style="height:520px"><canvas id="chart-barras"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-title" id="titulo-pie">Participación por Municipio — GHI</div>
+        <div class="chart-card-sub">% del total de irradiación del estado</div>
+        <div style="height:520px"><canvas id="chart-pie"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var map = L.map('map', {zoomControl:true}).setView([19.129824561403506,-101.9121052631579], 8);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+    attribution:'© OpenStreetMap © CARTO', maxZoom:18
+}).addTo(map);
+
+var layers = {};
+var currentLayer = null;
+
+
+    layers['GHI'] = L.layerGroup();
+    L.heatLayer([[18.04, -102.49, 0.6837228049405184], [18.04, -102.19, 0.632209203384286], [18.32, -103.41, 0.5623536646728764], [18.32, -103.11, 0.3004328654310602], [18.32, -102.81, 0.5239480743096288], [18.32, -102.49, 0.23548974889280677], [18.32, -102.19, 0.7156921554746007], [18.32, -101.89, 0.69057657794475], [18.6, -103.41, 0.27997438870002317], [18.6, -103.11, 0.0], [18.6, -100.99, 0.9716091715479833], [18.62, -102.81, 0.5669601553898646], [18.62, -102.51, 0.5314039775181519], [18.62, -102.19, 0.7079835262805478], [18.62, -101.89, 0.7202318149296899], [18.62, -101.59, 0.8422588862610719], [18.62, -101.29, 0.9718047989796574], [18.9, -103.41, 0.5618929831588176], [18.9, -103.11, 0.231910058874407], [18.9, -102.81, 0.6379271693598411], [18.9, -102.51, 0.78103950382026], [18.9, -102.19, 0.7881966128918482], [18.9, -101.89, 0.7541331080104058], [18.9, -101.59, 0.683059683099154], [18.9, -101.29, 1.0], [18.9, -100.97, 0.9934704559316889], [18.9, -100.67, 1.0], [19.18, -102.81, 0.7529346872266502], [19.18, -101.29, 0.9205410035965418], [19.18, -100.97, 1.0], [19.18, -100.67, 0.9599059145492771], [19.2, -102.51, 0.7331299240525359], [19.2, -102.19, 0.7971584904583021], [19.2, -101.89, 0.5136865557957658], [19.2, -101.59, 0.4873002110190361], [19.48, -102.51, 0.21060224115477474], [19.48, -102.19, 0.007373240074873066], [19.48, -101.89, 0.25705159029237323], [19.48, -101.59, 0.0], [19.48, -101.29, 0.425011203964245], [19.48, -100.97, 0.7883039971039278], [19.48, -100.67, 0.4249985514437874], [19.48, -100.37, 0.5270927122784828], [19.76, -101.27, 0.6774098460799036], [19.76, -100.97, 0.4099180447539883], [19.76, -100.67, 0.28336169552276336], [19.76, -100.35, 0.3429904290456647], [19.78, -102.51, 0.2958387028109269], [19.78, -102.19, 0.04075058903924844], [19.78, -101.89, 0.0], [19.78, -101.59, 0.2580407578531953], [20.06, -102.81, 0.793138557612736], [20.06, -102.51, 0.8095865097826473], [20.06, -102.19, 0.7068360400022192], [20.06, -101.89, 0.7451391125074088], [20.06, -101.59, 0.6307496216013618], [20.06, -100.35, 0.8627202828045206]], {
+        radius:28, blur:22, maxZoom:12,
+        gradient:{0.0: "#ffffcc", 0.25: "#fed976", 0.5: "#fd8d3c", 0.75: "#e31a1c", 1.0: "#800026"}
+    }).addTo(layers['GHI']);
+    L.circleMarker([18.04,-102.49],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Lázaro Cárdenas<br><b>GHI: 651.7 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.04,-102.19],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Lázaro Cárdenas<br><b>GHI: 647.2 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.32,-103.41],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aquila<br><b>GHI: 641.0 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.32,-103.11],
+                {radius:7,fillColor:'#fed976',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aquila<br><b>GHI: 618.0 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.32,-102.81],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>GHI: 637.7 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.32,-102.49],
+                {radius:7,fillColor:'#ffffcc',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>GHI: 612.3 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.32,-102.19],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>GHI: 654.5 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.32,-101.89],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>GHI: 652.3 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.6,-103.41],
+                {radius:7,fillColor:'#fed976',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aquila<br><b>GHI: 616.2 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.6,-103.11],
+                {radius:7,fillColor:'#ffffcc',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Coalcomán de Vázquez Pallares<br><b>GHI: 589.0 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.6,-100.99],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Huetamo<br><b>GHI: 677.0 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.62,-102.81],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aguililla<br><b>GHI: 641.4 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.62,-102.51],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tumbiscatío<br><b>GHI: 638.3 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.62,-102.19],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>GHI: 653.9 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.62,-101.89],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>GHI: 654.9 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.62,-101.59],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Churumuco<br><b>GHI: 665.7 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.62,-101.29],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Huetamo<br><b>GHI: 677.1 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.9,-103.41],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Chinicuila<br><b>GHI: 641.0 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.9,-103.11],
+                {radius:7,fillColor:'#ffffcc',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Coalcomán de Vázquez Pallares<br><b>GHI: 612.0 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.9,-102.81],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aguililla<br><b>GHI: 647.7 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.9,-102.51],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Apatzingán<br><b>GHI: 660.3 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.9,-102.19],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Múgica<br><b>GHI: 660.9 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.9,-101.89],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('La Huacana<br><b>GHI: 657.9 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.9,-101.59],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Churumuco<br><b>GHI: 651.7 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.9,-101.29],
+                {radius:7,fillColor:'#800026',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Turicato<br><b>GHI: 681.8 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.9,-100.97],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Carácuaro<br><b>GHI: 679.0 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([18.9,-100.67],
+                {radius:7,fillColor:'#800026',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tiquicheo de Nicolás Romero<br><b>GHI: 683.1 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.18,-102.81],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tepalcatepec<br><b>GHI: 657.8 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.18,-101.29],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Nocupétaro<br><b>GHI: 672.5 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.18,-100.97],
+                {radius:7,fillColor:'#800026',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tiquicheo de Nicolás Romero<br><b>GHI: 683.9 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.18,-100.67],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tuzantla<br><b>GHI: 676.0 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.2,-102.51],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Buenavista<br><b>GHI: 656.1 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.2,-102.19],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Parácuaro<br><b>GHI: 661.7 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.2,-101.89],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Nuevo Urecho<br><b>GHI: 636.8 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.2,-101.59],
+                {radius:7,fillColor:'#fed976',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tacámbaro<br><b>GHI: 634.4 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.48,-102.51],
+                {radius:7,fillColor:'#ffffcc',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Peribán<br><b>GHI: 610.1 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.48,-102.19],
+                {radius:7,fillColor:'#ffffcc',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Uruapan<br><b>GHI: 592.2 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.48,-101.89],
+                {radius:7,fillColor:'#fed976',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tingambato<br><b>GHI: 614.2 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.48,-101.59],
+                {radius:7,fillColor:'#ffffcc',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Pátzcuaro<br><b>GHI: 579.5 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.48,-101.29],
+                {radius:7,fillColor:'#fed976',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Acuitzio<br><b>GHI: 629.0 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.48,-100.97],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tzitzio<br><b>GHI: 660.9 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.48,-100.67],
+                {radius:7,fillColor:'#fed976',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Hidalgo<br><b>GHI: 629.0 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.48,-100.37],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Zitácuaro<br><b>GHI: 637.9 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.76,-101.27],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Morelia<br><b>GHI: 651.2 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.76,-100.97],
+                {radius:7,fillColor:'#fed976',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Indaparapeo<br><b>GHI: 627.6 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.76,-100.67],
+                {radius:7,fillColor:'#fed976',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Hidalgo<br><b>GHI: 616.5 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.76,-100.35],
+                {radius:7,fillColor:'#fed976',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Senguio<br><b>GHI: 621.7 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.78,-102.51],
+                {radius:7,fillColor:'#fed976',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tingüindín<br><b>GHI: 617.6 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.78,-102.19],
+                {radius:7,fillColor:'#ffffcc',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Chilchota<br><b>GHI: 595.2 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.78,-101.89],
+                {radius:7,fillColor:'#ffffcc',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Zacapu<br><b>GHI: 587.3 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([19.78,-101.59],
+                {radius:7,fillColor:'#fed976',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Coeneo<br><b>GHI: 614.3 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([20.06,-102.81],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Sahuayo<br><b>GHI: 661.3 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([20.06,-102.51],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Villamar<br><b>GHI: 662.8 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([20.06,-102.19],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Zamora<br><b>GHI: 653.7 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([20.06,-101.89],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Penjamillo<br><b>GHI: 657.1 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([20.06,-101.59],
+                {radius:7,fillColor:'#fd8d3c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Puruándiro<br><b>GHI: 647.1 W/m²</b>').addTo(layers['GHI']);
+L.circleMarker([20.06,-100.35],
+                {radius:7,fillColor:'#e31a1c',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Epitacio Huerta<br><b>GHI: 667.5 W/m²</b>').addTo(layers['GHI']);
+
+    
+    layers['DNI'] = L.layerGroup();
+    L.heatLayer([[18.04, -102.49, 0.6031609863960161], [18.04, -102.19, 0.5008188361358922], [18.32, -103.41, 0.5253478848818979], [18.32, -103.11, 0.30707203881397577], [18.32, -102.81, 0.49687967181020865], [18.32, -102.49, 0.09305370568807746], [18.32, -102.19, 0.6477108154384248], [18.32, -101.89, 0.6137903758966842], [18.6, -103.41, 0.27137733347413995], [18.6, -103.11, 0.0], [18.6, -100.99, 0.9435773667667199], [18.62, -102.81, 0.6142251467129699], [18.62, -102.51, 0.4383779427917175], [18.62, -102.19, 0.6131095405772128], [18.62, -101.89, 0.6467540637696289], [18.62, -101.59, 0.7871161649564442], [18.62, -101.29, 0.9994885952226514], [18.9, -103.41, 0.538884630969158], [18.9, -103.11, 0.23525425414219042], [18.9, -102.81, 0.6121171799205205], [18.9, -102.51, 0.7819697066818582], [18.9, -102.19, 0.7074368966036129], [18.9, -101.89, 0.7144844910223911], [18.9, -101.59, 0.6568077390947339], [18.9, -101.29, 1.0], [18.9, -100.97, 0.9731379441796707], [18.9, -100.67, 1.0], [19.18, -102.81, 0.7109451282075143], [19.18, -101.29, 0.9031526364059541], [19.18, -100.97, 1.0], [19.18, -100.67, 0.8431894462914232], [19.2, -102.51, 0.7384828165895161], [19.2, -102.19, 0.7954100739515794], [19.2, -101.89, 0.4286517848642653], [19.2, -101.59, 0.44223565422293276], [19.48, -102.51, 0.33536966990772044], [19.48, -102.19, 0.005331923530106481], [19.48, -101.89, 0.2549146800101865], [19.48, -101.59, 0.0], [19.48, -101.29, 0.28007872016909], [19.48, -100.97, 0.7567412718262807], [19.48, -100.67, 0.27305969823161796], [19.48, -100.37, 0.49183385690261006], [19.76, -101.27, 0.6692111811660246], [19.76, -100.97, 0.291315807966185], [19.76, -100.67, 0.1765855680127859], [19.76, -100.35, 0.23641975550649638], [19.78, -102.51, 0.4184833931589925], [19.78, -102.19, 0.14825232793114504], [19.78, -101.89, 0.0], [19.78, -101.59, 0.1075043447221748], [20.06, -102.81, 0.9338173056711517], [20.06, -102.51, 0.8908875789642705], [20.06, -102.19, 0.7348462220472116], [20.06, -101.89, 0.7331747318908274], [20.06, -101.59, 0.5711476533676947], [20.06, -100.35, 0.9530843268525131]], {
+        radius:28, blur:22, maxZoom:12,
+        gradient:{0.0: "#ffffe5", 0.25: "#fee391", 0.5: "#fe9929", 0.75: "#cc4c02", 1.0: "#662506"}
+    }).addTo(layers['DNI']);
+    L.circleMarker([18.04,-102.49],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Lázaro Cárdenas<br><b>DNI: 639.9 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.04,-102.19],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Lázaro Cárdenas<br><b>DNI: 626.2 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.32,-103.41],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aquila<br><b>DNI: 629.5 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.32,-103.11],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aquila<br><b>DNI: 600.3 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.32,-102.81],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>DNI: 625.7 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.32,-102.49],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>DNI: 571.6 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.32,-102.19],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>DNI: 645.9 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.32,-101.89],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>DNI: 641.3 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.6,-103.41],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aquila<br><b>DNI: 595.5 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.6,-103.11],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Coalcomán de Vázquez Pallares<br><b>DNI: 555.1 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.6,-100.99],
+                {radius:7,fillColor:'#cc4c02',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Huetamo<br><b>DNI: 685.5 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.62,-102.81],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aguililla<br><b>DNI: 641.4 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.62,-102.51],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tumbiscatío<br><b>DNI: 617.8 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.62,-102.19],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>DNI: 641.2 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.62,-101.89],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>DNI: 645.7 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.62,-101.59],
+                {radius:7,fillColor:'#cc4c02',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Churumuco<br><b>DNI: 664.5 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.62,-101.29],
+                {radius:7,fillColor:'#cc4c02',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Huetamo<br><b>DNI: 692.9 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.9,-103.41],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Chinicuila<br><b>DNI: 631.3 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.9,-103.11],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Coalcomán de Vázquez Pallares<br><b>DNI: 590.6 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.9,-102.81],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aguililla<br><b>DNI: 641.1 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.9,-102.51],
+                {radius:7,fillColor:'#cc4c02',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Apatzingán<br><b>DNI: 663.8 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.9,-102.19],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Múgica<br><b>DNI: 653.8 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.9,-101.89],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('La Huacana<br><b>DNI: 654.8 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.9,-101.59],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Churumuco<br><b>DNI: 647.1 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.9,-101.29],
+                {radius:7,fillColor:'#662506',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Turicato<br><b>DNI: 693.3 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.9,-100.97],
+                {radius:7,fillColor:'#cc4c02',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Carácuaro<br><b>DNI: 689.4 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([18.9,-100.67],
+                {radius:7,fillColor:'#662506',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tiquicheo de Nicolás Romero<br><b>DNI: 693.9 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.18,-102.81],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tepalcatepec<br><b>DNI: 654.3 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.18,-101.29],
+                {radius:7,fillColor:'#cc4c02',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Nocupétaro<br><b>DNI: 680.0 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.18,-100.97],
+                {radius:7,fillColor:'#662506',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tiquicheo de Nicolás Romero<br><b>DNI: 697.3 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.18,-100.67],
+                {radius:7,fillColor:'#cc4c02',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tuzantla<br><b>DNI: 672.0 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.2,-102.51],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Buenavista<br><b>DNI: 658.0 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.2,-102.19],
+                {radius:7,fillColor:'#cc4c02',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Parácuaro<br><b>DNI: 665.6 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.2,-101.89],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Nuevo Urecho<br><b>DNI: 616.5 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.2,-101.59],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tacámbaro<br><b>DNI: 618.4 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.48,-102.51],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Peribán<br><b>DNI: 604.0 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.48,-102.19],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Uruapan<br><b>DNI: 559.9 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.48,-101.89],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tingambato<br><b>DNI: 593.3 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.48,-101.59],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Pátzcuaro<br><b>DNI: 524.8 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.48,-101.29],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Acuitzio<br><b>DNI: 596.6 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.48,-100.97],
+                {radius:7,fillColor:'#cc4c02',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tzitzio<br><b>DNI: 660.4 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.48,-100.67],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Hidalgo<br><b>DNI: 595.7 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.48,-100.37],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Zitácuaro<br><b>DNI: 625.0 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.76,-101.27],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Morelia<br><b>DNI: 648.7 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.76,-100.97],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Indaparapeo<br><b>DNI: 598.2 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.76,-100.67],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Hidalgo<br><b>DNI: 582.8 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.76,-100.35],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Senguio<br><b>DNI: 590.8 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.78,-102.51],
+                {radius:7,fillColor:'#fee391',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tingüindín<br><b>DNI: 615.2 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.78,-102.19],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Chilchota<br><b>DNI: 579.0 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.78,-101.89],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Zacapu<br><b>DNI: 556.3 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([19.78,-101.59],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Coeneo<br><b>DNI: 573.5 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([20.06,-102.81],
+                {radius:7,fillColor:'#cc4c02',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Sahuayo<br><b>DNI: 684.1 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([20.06,-102.51],
+                {radius:7,fillColor:'#cc4c02',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Villamar<br><b>DNI: 678.4 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([20.06,-102.19],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Zamora<br><b>DNI: 657.5 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([20.06,-101.89],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Penjamillo<br><b>DNI: 657.3 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([20.06,-101.59],
+                {radius:7,fillColor:'#fe9929',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Puruándiro<br><b>DNI: 635.6 W/m²</b>').addTo(layers['DNI']);
+L.circleMarker([20.06,-100.35],
+                {radius:7,fillColor:'#cc4c02',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Epitacio Huerta<br><b>DNI: 686.7 W/m²</b>').addTo(layers['DNI']);
+
+    
+    layers['DHI'] = L.layerGroup();
+    L.heatLayer([[18.04, -102.49, 0.22198342518000572], [18.04, -102.19, 0.3507344539528004], [18.32, -103.41, 0.25215488563291916], [18.32, -103.11, 0.4274280274730263], [18.32, -102.81, 0.3082833897987498], [18.32, -102.49, 0.7907325543175838], [18.32, -102.19, 0.26285072287311906], [18.32, -101.89, 0.2119514108458752], [18.6, -103.41, 0.45375543807167007], [18.6, -103.11, 0.7980704482410306], [18.6, -100.99, 0.0], [18.62, -102.81, 0.1573066143452412], [18.62, -102.51, 0.505069172723063], [18.62, -102.19, 0.3800837895242931], [18.62, -101.89, 0.19276924365350598], [18.62, -101.59, 0.1301996411887381], [18.62, -101.29, 0.0], [18.9, -103.41, 0.25879012786388955], [18.9, -103.11, 0.6638161857025086], [18.9, -102.81, 0.20316639792134608], [18.9, -102.51, 0.12509216236138754], [18.9, -102.19, 0.20646161781390462], [18.9, -101.89, 0.24391347571808492], [18.9, -101.59, 0.41128570623184735], [18.9, -101.29, 0.0], [18.9, -100.97, 0.013357102523924578], [18.9, -100.67, 0.002242362414990382], [19.18, -102.81, 0.2181610298412333], [19.18, -101.29, 0.19667601693197026], [19.18, -100.97, 0.051235330371148045], [19.18, -100.67, 0.25347730449304173], [19.2, -102.51, 0.16448620629333663], [19.2, -102.19, 0.1769382994110119], [19.2, -101.89, 0.48551290510781264], [19.2, -101.59, 0.5535521395039171], [19.48, -102.51, 0.3443538389557666], [19.48, -102.19, 0.8071421968190244], [19.48, -101.89, 0.6443196546817308], [19.48, -101.59, 1.0], [19.48, -101.29, 0.8874923966283633], [19.48, -100.97, 0.27743690582830444], [19.48, -100.67, 0.98811869001634], [19.48, -100.37, 0.6171619054199273], [19.76, -101.27, 0.46300564972564934], [19.76, -100.97, 0.9160158737812825], [19.76, -100.67, 1.0], [19.76, -100.35, 0.982445206956368], [19.78, -102.51, 0.3470852947379963], [19.78, -102.19, 0.5965057377589622], [19.78, -101.89, 0.8730376341810173], [19.78, -101.59, 1.0], [20.06, -102.81, 0.011892062544500105], [20.06, -102.51, 0.12376078301209432], [20.06, -102.19, 0.32291810873694365], [20.06, -101.89, 0.3689242469695049], [20.06, -101.59, 0.5720137340254687], [20.06, -100.35, 0.1210756230905812]], {
+        radius:28, blur:22, maxZoom:12,
+        gradient:{0.0: "#f1eef6", 0.25: "#bdc9e1", 0.5: "#74a9cf", 0.75: "#0570b0", 1.0: "#023858"}
+    }).addTo(layers['DHI']);
+    L.circleMarker([18.04,-102.49],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Lázaro Cárdenas<br><b>DHI: 169.5 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.04,-102.19],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Lázaro Cárdenas<br><b>DHI: 174.4 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.32,-103.41],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aquila<br><b>DHI: 170.7 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.32,-103.11],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aquila<br><b>DHI: 177.4 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.32,-102.81],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>DHI: 172.8 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.32,-102.49],
+                {radius:7,fillColor:'#0570b0',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>DHI: 191.3 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.32,-102.19],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>DHI: 171.1 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.32,-101.89],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>DHI: 169.1 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.6,-103.41],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aquila<br><b>DHI: 178.4 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.6,-103.11],
+                {radius:7,fillColor:'#0570b0',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Coalcomán de Vázquez Pallares<br><b>DHI: 191.5 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.6,-100.99],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Huetamo<br><b>DHI: 160.7 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.62,-102.81],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aguililla<br><b>DHI: 167.0 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.62,-102.51],
+                {radius:7,fillColor:'#74a9cf',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tumbiscatío<br><b>DHI: 180.3 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.62,-102.19],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>DHI: 175.6 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.62,-101.89],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>DHI: 168.4 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.62,-101.59],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Churumuco<br><b>DHI: 166.0 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.62,-101.29],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Huetamo<br><b>DHI: 156.5 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.9,-103.41],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Chinicuila<br><b>DHI: 170.9 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.9,-103.11],
+                {radius:7,fillColor:'#74a9cf',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Coalcomán de Vázquez Pallares<br><b>DHI: 186.4 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.9,-102.81],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aguililla<br><b>DHI: 168.8 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.9,-102.51],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Apatzingán<br><b>DHI: 165.8 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.9,-102.19],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Múgica<br><b>DHI: 168.9 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.9,-101.89],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('La Huacana<br><b>DHI: 170.4 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.9,-101.59],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Churumuco<br><b>DHI: 176.8 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.9,-101.29],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Turicato<br><b>DHI: 160.2 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.9,-100.97],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Carácuaro<br><b>DHI: 161.5 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([18.9,-100.67],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tiquicheo de Nicolás Romero<br><b>DHI: 161.1 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.18,-102.81],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tepalcatepec<br><b>DHI: 169.4 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.18,-101.29],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Nocupétaro<br><b>DHI: 168.6 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.18,-100.97],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tiquicheo de Nicolás Romero<br><b>DHI: 163.0 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.18,-100.67],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tuzantla<br><b>DHI: 170.7 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.2,-102.51],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Buenavista<br><b>DHI: 167.3 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.2,-102.19],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Parácuaro<br><b>DHI: 167.8 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.2,-101.89],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Nuevo Urecho<br><b>DHI: 179.6 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.2,-101.59],
+                {radius:7,fillColor:'#74a9cf',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tacámbaro<br><b>DHI: 182.2 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.48,-102.51],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Peribán<br><b>DHI: 174.2 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.48,-102.19],
+                {radius:7,fillColor:'#0570b0',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Uruapan<br><b>DHI: 191.9 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.48,-101.89],
+                {radius:7,fillColor:'#74a9cf',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tingambato<br><b>DHI: 185.7 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.48,-101.59],
+                {radius:7,fillColor:'#023858',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Pátzcuaro<br><b>DHI: 208.5 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.48,-101.29],
+                {radius:7,fillColor:'#0570b0',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Acuitzio<br><b>DHI: 195.0 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.48,-100.97],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tzitzio<br><b>DHI: 171.6 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.48,-100.67],
+                {radius:7,fillColor:'#0570b0',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Hidalgo<br><b>DHI: 198.8 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.48,-100.37],
+                {radius:7,fillColor:'#74a9cf',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Zitácuaro<br><b>DHI: 184.6 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.76,-101.27],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Morelia<br><b>DHI: 178.7 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.76,-100.97],
+                {radius:7,fillColor:'#0570b0',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Indaparapeo<br><b>DHI: 196.0 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.76,-100.67],
+                {radius:7,fillColor:'#023858',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Hidalgo<br><b>DHI: 201.1 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.76,-100.35],
+                {radius:7,fillColor:'#0570b0',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Senguio<br><b>DHI: 198.6 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.78,-102.51],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tingüindín<br><b>DHI: 174.3 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.78,-102.19],
+                {radius:7,fillColor:'#74a9cf',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Chilchota<br><b>DHI: 183.8 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.78,-101.89],
+                {radius:7,fillColor:'#0570b0',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Zacapu<br><b>DHI: 194.4 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([19.78,-101.59],
+                {radius:7,fillColor:'#023858',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Coeneo<br><b>DHI: 203.7 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([20.06,-102.81],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Sahuayo<br><b>DHI: 161.5 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([20.06,-102.51],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Villamar<br><b>DHI: 165.8 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([20.06,-102.19],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Zamora<br><b>DHI: 173.4 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([20.06,-101.89],
+                {radius:7,fillColor:'#bdc9e1',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Penjamillo<br><b>DHI: 175.1 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([20.06,-101.59],
+                {radius:7,fillColor:'#74a9cf',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Puruándiro<br><b>DHI: 182.9 W/m²</b>').addTo(layers['DHI']);
+L.circleMarker([20.06,-100.35],
+                {radius:7,fillColor:'#f1eef6',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Epitacio Huerta<br><b>DHI: 165.7 W/m²</b>').addTo(layers['DHI']);
+
+    
+    layers['clearsky_ghi'] = L.layerGroup();
+    L.heatLayer([[18.04, -102.49, 0.009721901744110566], [18.04, -102.19, 0.0], [18.32, -103.41, 0.0], [18.32, -103.11, 0.1775206524206162], [18.32, -102.81, 0.22330622880744153], [18.32, -102.49, 0.16089283524785777], [18.32, -102.19, 0.19723400135943422], [18.32, -101.89, 0.0491377641423028], [18.6, -103.41, 0.0627956279964223], [18.6, -103.11, 0.5505991091278843], [18.6, -100.99, 0.36437023986409595], [18.62, -102.81, 0.3351020619547214], [18.62, -102.51, 0.3626551382603525], [18.62, -102.19, 0.2672920836558011], [18.62, -101.89, 0.0], [18.62, -101.59, 0.1853577999113686], [18.62, -101.29, 0.3457713973825846], [18.9, -103.41, 0.031843822971218495], [18.9, -103.11, 0.6333816561203778], [18.9, -102.81, 0.09210663184837067], [18.9, -102.51, 0.40699856393043216], [18.9, -102.19, 0.03168438663079853], [18.9, -101.89, 0.29907512474707953], [18.9, -101.59, 0.711838266937844], [18.9, -101.29, 0.3335995421382059], [18.9, -100.97, 0.3540693107373988], [18.9, -100.67, 0.36444712017064257], [19.18, -102.81, 0.09746709832288768], [19.18, -101.29, 0.5936562085951564], [19.18, -100.97, 0.47709998814458254], [19.18, -100.67, 0.22396151732631944], [19.2, -102.51, 0.24135194586199324], [19.2, -102.19, 0.3241984737807406], [19.2, -101.89, 0.08540256592254437], [19.2, -101.59, 0.8944878161579576], [19.48, -102.51, 0.42687444506094246], [19.48, -102.19, 0.9849795487886998], [19.48, -101.89, 0.5316782981142607], [19.48, -101.59, 0.9182144202935034], [19.48, -101.29, 0.8409868624303452], [19.48, -100.97, 0.48647990151836784], [19.48, -100.67, 0.9667553043108928], [19.48, -100.37, 0.7441718535800236], [19.76, -101.27, 0.9757755829621112], [19.76, -100.97, 0.8244348936137078], [19.76, -100.67, 1.0], [19.76, -100.35, 0.9003162721495024], [19.78, -102.51, 0.6262400432150166], [19.78, -102.19, 0.8752290413806608], [19.78, -101.89, 1.0], [19.78, -101.59, 0.8217373752068571], [20.06, -102.81, 0.750271712532929], [20.06, -102.51, 0.6263695529931574], [20.06, -102.19, 0.6127596748337268], [20.06, -101.89, 0.7342125000434836], [20.06, -101.59, 0.7747325493947483], [20.06, -100.35, 1.0]], {
+        radius:28, blur:22, maxZoom:12,
+        gradient:{0.0: "#ffffe5", 0.25: "#addd8e", 0.5: "#41ab5d", 0.75: "#006837", 1.0: "#004529"}
+    }).addTo(layers['clearsky_ghi']);
+    L.circleMarker([18.04,-102.49],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Lázaro Cárdenas<br><b>clearsky_ghi: 722.3 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.04,-102.19],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Lázaro Cárdenas<br><b>clearsky_ghi: 718.9 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.32,-103.41],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aquila<br><b>clearsky_ghi: 715.8 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.32,-103.11],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aquila<br><b>clearsky_ghi: 731.6 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.32,-102.81],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>clearsky_ghi: 734.1 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.32,-102.49],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>clearsky_ghi: 730.7 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.32,-102.19],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>clearsky_ghi: 732.7 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.32,-101.89],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>clearsky_ghi: 724.5 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.6,-103.41],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aquila<br><b>clearsky_ghi: 725.2 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.6,-103.11],
+                {radius:7,fillColor:'#41ab5d',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Coalcomán de Vázquez Pallares<br><b>clearsky_ghi: 752.2 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.6,-100.99],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Huetamo<br><b>clearsky_ghi: 741.9 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.62,-102.81],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aguililla<br><b>clearsky_ghi: 740.3 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.62,-102.51],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tumbiscatío<br><b>clearsky_ghi: 741.8 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.62,-102.19],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>clearsky_ghi: 736.6 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.62,-101.89],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Arteaga<br><b>clearsky_ghi: 719.6 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.62,-101.59],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Churumuco<br><b>clearsky_ghi: 732.0 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.62,-101.29],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Huetamo<br><b>clearsky_ghi: 740.9 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.9,-103.41],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Chinicuila<br><b>clearsky_ghi: 723.5 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.9,-103.11],
+                {radius:7,fillColor:'#41ab5d',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Coalcomán de Vázquez Pallares<br><b>clearsky_ghi: 756.8 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.9,-102.81],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Aguililla<br><b>clearsky_ghi: 726.9 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.9,-102.51],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Apatzingán<br><b>clearsky_ghi: 744.3 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.9,-102.19],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Múgica<br><b>clearsky_ghi: 723.5 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.9,-101.89],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('La Huacana<br><b>clearsky_ghi: 738.3 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.9,-101.59],
+                {radius:7,fillColor:'#41ab5d',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Churumuco<br><b>clearsky_ghi: 761.1 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.9,-101.29],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Turicato<br><b>clearsky_ghi: 740.2 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.9,-100.97],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Carácuaro<br><b>clearsky_ghi: 741.4 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([18.9,-100.67],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tiquicheo de Nicolás Romero<br><b>clearsky_ghi: 741.9 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.18,-102.81],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tepalcatepec<br><b>clearsky_ghi: 727.2 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.18,-101.29],
+                {radius:7,fillColor:'#41ab5d',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Nocupétaro<br><b>clearsky_ghi: 754.6 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.18,-100.97],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tiquicheo de Nicolás Romero<br><b>clearsky_ghi: 748.2 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.18,-100.67],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tuzantla<br><b>clearsky_ghi: 734.2 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.2,-102.51],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Buenavista<br><b>clearsky_ghi: 735.1 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.2,-102.19],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Parácuaro<br><b>clearsky_ghi: 739.7 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.2,-101.89],
+                {radius:7,fillColor:'#ffffe5',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Nuevo Urecho<br><b>clearsky_ghi: 726.5 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.2,-101.59],
+                {radius:7,fillColor:'#006837',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tacámbaro<br><b>clearsky_ghi: 771.2 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.48,-102.51],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Peribán<br><b>clearsky_ghi: 745.4 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.48,-102.19],
+                {radius:7,fillColor:'#006837',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Uruapan<br><b>clearsky_ghi: 776.3 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.48,-101.89],
+                {radius:7,fillColor:'#41ab5d',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tingambato<br><b>clearsky_ghi: 751.2 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.48,-101.59],
+                {radius:7,fillColor:'#006837',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Pátzcuaro<br><b>clearsky_ghi: 772.6 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.48,-101.29],
+                {radius:7,fillColor:'#006837',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Acuitzio<br><b>clearsky_ghi: 768.3 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.48,-100.97],
+                {radius:7,fillColor:'#addd8e',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tzitzio<br><b>clearsky_ghi: 748.7 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.48,-100.67],
+                {radius:7,fillColor:'#006837',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Hidalgo<br><b>clearsky_ghi: 775.2 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.48,-100.37],
+                {radius:7,fillColor:'#41ab5d',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Zitácuaro<br><b>clearsky_ghi: 762.9 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.76,-101.27],
+                {radius:7,fillColor:'#006837',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Morelia<br><b>clearsky_ghi: 775.7 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.76,-100.97],
+                {radius:7,fillColor:'#006837',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Indaparapeo<br><b>clearsky_ghi: 767.4 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.76,-100.67],
+                {radius:7,fillColor:'#004529',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Hidalgo<br><b>clearsky_ghi: 783.1 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.76,-100.35],
+                {radius:7,fillColor:'#006837',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Senguio<br><b>clearsky_ghi: 771.6 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.78,-102.51],
+                {radius:7,fillColor:'#41ab5d',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Tingüindín<br><b>clearsky_ghi: 756.4 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.78,-102.19],
+                {radius:7,fillColor:'#006837',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Chilchota<br><b>clearsky_ghi: 770.2 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.78,-101.89],
+                {radius:7,fillColor:'#004529',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Zacapu<br><b>clearsky_ghi: 780.4 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([19.78,-101.59],
+                {radius:7,fillColor:'#006837',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Coeneo<br><b>clearsky_ghi: 767.2 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([20.06,-102.81],
+                {radius:7,fillColor:'#006837',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Sahuayo<br><b>clearsky_ghi: 763.3 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([20.06,-102.51],
+                {radius:7,fillColor:'#41ab5d',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Villamar<br><b>clearsky_ghi: 756.4 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([20.06,-102.19],
+                {radius:7,fillColor:'#41ab5d',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Zamora<br><b>clearsky_ghi: 755.7 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([20.06,-101.89],
+                {radius:7,fillColor:'#41ab5d',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Penjamillo<br><b>clearsky_ghi: 762.4 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([20.06,-101.59],
+                {radius:7,fillColor:'#006837',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Puruándiro<br><b>clearsky_ghi: 764.6 W/m²</b>').addTo(layers['clearsky_ghi']);
+L.circleMarker([20.06,-100.35],
+                {radius:7,fillColor:'#004529',color:'#fff',weight:0.8,
+                 opacity:0.9,fillOpacity:0.88})
+                .bindPopup('Epitacio Huerta<br><b>clearsky_ghi: 785.0 W/m²</b>').addTo(layers['clearsky_ghi']);
+
+    
+
+var municipios = ["Tiquicheo de Nicol\u00e1s Romero", "Turicato", "Car\u00e1cuaro", "Huetamo", "Tuzantla", "Nocup\u00e9taro", "Epitacio Huerta", "Villamar", "Par\u00e1cuaro", "Sahuayo", "Tzitzio", "M\u00fagica", "Apatzing\u00e1n", "Churumuco", "La Huacana", "Tepalcatepec", "Penjamillo", "Buenavista", "Zamora", "Morelia", "L\u00e1zaro C\u00e1rdenas", "Puru\u00e1ndiro", "Aguililla", "Arteaga", "Chinicuila", "Tumbiscat\u00edo", "Zit\u00e1cuaro", "Nuevo Urecho", "Tac\u00e1mbaro", "Acuitzio", "Indaparapeo", "Aquila", "Hidalgo", "Senguio", "Ting\u00fcind\u00edn", "Coeneo", "Tingambato", "Perib\u00e1n", "Coalcom\u00e1n de V\u00e1zquez Pallares", "Chilchota", "Uruapan", "Zacapu", "P\u00e1tzcuaro"];
+var datos      = {"GHI": {"valores": [683.5, 681.8, 679.0, 677.0, 676.0, 672.5, 667.5, 662.8, 661.7, 661.3, 660.9, 660.9, 660.3, 658.7, 657.9, 657.8, 657.1, 656.1, 653.7, 651.2, 649.5, 647.1, 644.6, 644.3, 641.0, 638.3, 637.9, 636.8, 634.4, 629.0, 627.6, 625.1, 622.7, 621.7, 617.6, 614.3, 614.2, 610.1, 600.5, 595.2, 592.2, 587.3, 579.5], "porcentajes": [2.48, 2.47, 2.46, 2.45, 2.45, 2.44, 2.42, 2.4, 2.4, 2.4, 2.39, 2.39, 2.39, 2.39, 2.38, 2.38, 2.38, 2.38, 2.37, 2.36, 2.35, 2.34, 2.33, 2.33, 2.32, 2.31, 2.31, 2.31, 2.3, 2.28, 2.27, 2.26, 2.26, 2.25, 2.24, 2.22, 2.22, 2.21, 2.17, 2.16, 2.15, 2.13, 2.1]}, "DNI": {"valores": [695.6, 693.3, 689.4, 689.2, 672.0, 680.0, 686.7, 678.4, 665.6, 684.1, 660.4, 653.8, 663.8, 655.8, 654.8, 654.3, 657.3, 658.0, 657.5, 648.7, 633.0, 635.6, 641.2, 628.6, 631.3, 617.8, 625.0, 616.5, 618.4, 596.6, 598.2, 608.4, 589.3, 590.8, 615.2, 573.5, 593.3, 604.0, 572.9, 579.0, 559.9, 556.3, 524.8], "porcentajes": [2.56, 2.55, 2.53, 2.53, 2.47, 2.5, 2.52, 2.49, 2.45, 2.51, 2.43, 2.4, 2.44, 2.41, 2.41, 2.4, 2.42, 2.42, 2.42, 2.38, 2.33, 2.34, 2.36, 2.31, 2.32, 2.27, 2.3, 2.27, 2.27, 2.19, 2.2, 2.24, 2.17, 2.17, 2.26, 2.11, 2.18, 2.22, 2.11, 2.13, 2.06, 2.04, 1.93]}, "DHI": {"valores": [162.1, 160.2, 161.5, 158.6, 170.7, 168.6, 165.7, 165.8, 167.8, 161.5, 171.6, 168.9, 165.8, 171.4, 170.4, 169.4, 175.1, 167.3, 173.4, 178.7, 172.0, 182.9, 167.9, 174.7, 170.9, 180.3, 184.6, 179.6, 182.2, 195.0, 196.0, 175.5, 199.9, 198.6, 174.3, 203.7, 185.7, 174.2, 189.0, 183.8, 191.9, 194.4, 208.5], "porcentajes": [2.13, 2.1, 2.12, 2.08, 2.24, 2.21, 2.17, 2.18, 2.2, 2.12, 2.25, 2.22, 2.18, 2.25, 2.24, 2.22, 2.3, 2.2, 2.28, 2.35, 2.26, 2.4, 2.2, 2.29, 2.24, 2.37, 2.42, 2.36, 2.39, 2.56, 2.57, 2.3, 2.62, 2.61, 2.29, 2.67, 2.44, 2.29, 2.48, 2.41, 2.52, 2.55, 2.74]}, "clearsky_ghi": {"valores": [745.0, 740.2, 741.4, 741.4, 734.2, 754.6, 785.0, 756.4, 739.7, 763.3, 748.7, 723.5, 744.3, 746.6, 738.3, 727.2, 762.4, 735.1, 755.7, 775.7, 720.6, 764.6, 733.6, 729.7, 723.5, 741.8, 762.9, 726.5, 771.2, 768.3, 767.4, 724.2, 779.2, 771.6, 756.4, 767.2, 751.2, 745.4, 754.5, 770.2, 776.3, 780.4, 772.6], "porcentajes": [2.31, 2.29, 2.29, 2.29, 2.27, 2.33, 2.43, 2.34, 2.29, 2.36, 2.32, 2.24, 2.3, 2.31, 2.28, 2.25, 2.36, 2.27, 2.34, 2.4, 2.23, 2.37, 2.27, 2.26, 2.24, 2.3, 2.36, 2.25, 2.39, 2.38, 2.37, 2.24, 2.41, 2.39, 2.34, 2.37, 2.32, 2.31, 2.33, 2.38, 2.4, 2.41, 2.39]}};
+var varActual  = 'GHI';
+var chartBarras = null;
+var chartPie    = null;
+
+function getColores(n) {
+  var barras = [], pie = [];
+  for (var i = 0; i < n; i++) {
+    var t = i / Math.max(n - 1, 1);
+    var g = Math.round(184 * (1 - t * 0.85));
+    barras.push('rgba(255,' + g + ',0,0.85)');
+    var hue = 25 + (i / n) * 55, light = 38 + (i % 4) * 8;
+    pie.push('hsl(' + hue + ',88%,' + light + '%)');
+  }
+  return { barras: barras, pie: pie };
+}
+
+function cambiarVariable(col) {
+  varActual = col;
+  document.querySelectorAll('.var-btn').forEach(function(b) { b.classList.remove('active'); });
+  event.target.classList.add('active');
+  document.getElementById('titulo-barras').textContent = col + ' Promedio por Municipio';
+  document.getElementById('titulo-pie').textContent    = 'Participación por Municipio — ' + col;
+  actualizarGraficas();
+}
+
+function getOrdenados() {
+  var d = datos[varActual];
+  var indices = municipios.map(function(_, i) { return i; });
+  indices.sort(function(a, b) { return d.valores[b] - d.valores[a]; });
+  return {
+    municipios:  indices.map(function(i) { return municipios[i]; }),
+    valores:     indices.map(function(i) { return d.valores[i]; }),
+    porcentajes: indices.map(function(i) { return d.porcentajes[i]; })
+  };
+}
+
+function actualizarGraficas() {
+  var o = getOrdenados(), c = getColores(o.municipios.length);
+  if (chartBarras) {
+    chartBarras.data.labels = o.municipios;
+    chartBarras.data.datasets[0].data = o.valores;
+    chartBarras.data.datasets[0].backgroundColor = c.barras;
+    chartBarras.update();
+  }
+  if (chartPie) {
+    chartPie.data.labels = o.municipios;
+    chartPie.data.datasets[0].data = o.porcentajes;
+    chartPie.data.datasets[0].backgroundColor = c.pie;
+    chartPie.update();
+  }
+}
+
+function crearGraficas() {
+  var o = getOrdenados(), c = getColores(o.municipios.length);
+  var tt = { backgroundColor:'#0D1B2A', titleColor:'#FFB800', bodyColor:'#E8E0D0',
+              borderColor:'rgba(255,184,0,0.3)', borderWidth:1 };
+  chartBarras = new Chart(document.getElementById('chart-barras'), {
+    type: 'bar',
+    data: { labels: o.municipios, datasets: [{ label: varActual, data: o.valores,
+              backgroundColor: c.barras, borderRadius: 4, borderWidth: 0 }] },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: Object.assign({}, tt, { callbacks: { label: function(ctx) { return '  ' + ctx.parsed.x.toFixed(1) + ' W/m²'; } } }) },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#7A8EA8', font: { family: 'Space Mono', size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#E8E0D0', font: { family: 'Space Mono', size: 10 } } }
+      }
+    }
+  });
+  chartPie = new Chart(document.getElementById('chart-pie'), {
+    type: 'doughnut',
+    data: { labels: o.municipios, datasets: [{ data: o.porcentajes, backgroundColor: c.pie,
+              borderColor: '#0D1B2A', borderWidth: 2, hoverOffset: 8 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#7A8EA8', font: { size: 10, family: 'Space Mono' }, boxWidth: 12, padding: 8 } },
+        tooltip: Object.assign({}, tt, { callbacks: { label: function(ctx) { return '  ' + ctx.label + ': ' + ctx.parsed.toFixed(2) + '%'; } } })
+      }
+    }
+  });
+}
+
+function switchTab(col) {
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  event.target.classList.add('active');
+  if (col === 'municipios') {
+    if (currentLayer) { map.removeLayer(currentLayer); currentLayer = null; }
+    document.getElementById('map-container').style.display    = 'none';
+    document.getElementById('panel-municipios').style.display = 'block';
+    if (!chartBarras) crearGraficas();
+  } else {
+    document.getElementById('panel-municipios').style.display = 'none';
+    document.getElementById('map-container').style.display    = 'block';
+    if (currentLayer) map.removeLayer(currentLayer);
+    currentLayer = layers[col];
+    currentLayer.addTo(map);
+    map.invalidateSize();
+    document.querySelectorAll('.map-panel').forEach(function(p) { p.classList.remove('active'); });
+    document.getElementById('panel-' + col).classList.add('active');
+  }
+}
+
+currentLayer = layers['GHI'];
+currentLayer.addTo(map);
+</script>
+</body>
+</html>
